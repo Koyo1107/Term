@@ -58,14 +58,17 @@ li_max = 10
 li_del = 0
 tests = []
 flscr = 'fullscreen'
-circle_list = deque()
+# circle_list = deque()
+circle_list = {}
 color_list = deque()
+check_id = deque()
 B = []
 G = []
 R = []
 centers = None
 #cv2.namedWindow(flscr, cv2.WND_PROP_FULLSCREEN)
 #cv2.setWindowProperty(flscr, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+#counter = 0
 
 while(vid.isOpened()):
 #for ii in range(40):
@@ -89,7 +92,7 @@ while(vid.isOpened()):
         n_cls_preds = len(unique_labels)
         #print('mot_tracker run')            
 
-        for trk in mot_tracker.trackers:
+        for i, trk in enumerate(mot_tracker.trackers):
             color = colors[int(trk.id+1) % len(colors)]
             color = [i * 255 for i in color]
             trk.color = color
@@ -107,20 +110,23 @@ while(vid.isOpened()):
             cv2.rectangle(frame, (x1, y1), (x1+box_w, y1+box_h),trk.color, 4)
             #cv2.rectangle(frame, (x1, y1-35), (x1+len(cls)*19+60, y1), trk.color, -1)
             #cv2.putText(frame, cls + "-" + str(int(trk.id)),(x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 3)
+            #print('id', trk.id) 
+            if not i in circle_list:
+                circle_list[i] = []
+            if trk.cir_x is not None and trk.cir_y is not None:
+                if cls == 'Write':
+                    #circle_list.appendleft(trk.centers)
+                    circle_list[i].append((trk.cir_x, trk.cir_y))
+                    color_list.append(trk.color)
+                    check_id.append(trk.id)
 
-            if cls == 'Write':
-                #circle_list.appendleft(trk.centers)
-                circle_list.append((trk.cir_x, trk.cir_y))
-                color_list.append(trk.color)
-                #B.append(trk.col_b)
-                #G.append(trk.col_g)
-                #R.append(trk.col_r)
-                #print('color_list', B, G, R)
-
-    for i in range(len(circle_list)):
-        #if color_list[i] is not None:
-        #print('color_data', (B[i], G[i], R[i]))
-        cv2.circle(frame, circle_list[i], 10, color_list[i], -1)
+    #if counter > 1:
+    for box_id in circle_list.keys():
+        for i in range(len(circle_list[box_id])):
+            #print(circle_list)
+            cv2.circle(frame, circle_list[box_id][i], 7, color_list[i], -1)
+            if i > 0:
+                cv2.line(frame, circle_list[box_id][i-1], circle_list[box_id][i],  color_list[i], 14)
     
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     cv2.imshow(flscr,frame)
