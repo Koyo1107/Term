@@ -8,6 +8,8 @@ from torch.autograd import Variable
 import matplotlib.pyplot as plt
 from PIL import Image
 from collections import deque
+import time
+import warnings
 
 config_path='cfg/yolov3.cfg'
 weights_path='backup_0116/yolov3_6000.weights'
@@ -22,6 +24,8 @@ model.cuda()
 model.eval()
 classes = utils.load_classes(class_path)
 Tensor = torch.cuda.FloatTensor
+
+warnings.simplefilter('ignore')
 
 def detect_image(img):
     # scale and pad image
@@ -58,39 +62,33 @@ li_max = 10
 li_del = 0
 tests = []
 flscr = 'fullscreen'
-# circle_list = deque()
 circle_list = {}
-color_list = deque()
+#color_list = {}
+#time_counter = {}
 check_id = deque()
-B = []
-G = []
-R = []
 centers = None
 #cv2.namedWindow(flscr, cv2.WND_PROP_FULLSCREEN)
 #cv2.setWindowProperty(flscr, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-#counter = 0
 
 while(vid.isOpened()):
-#for ii in range(40):
     ret, frame = vid.read()
     
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     pilimg = Image.fromarray(frame)
     detections = detect_image(pilimg)
     
+    #frame = np.zeros((480, 640, 3))
     img = np.array(pilimg)
     mot_tracker.img_shape = [img.shape[0], img.shape[1]]
     mot_tracker.pad_x = max(img.shape[0] - img.shape[1], 0) * (img_size / max(img.shape))
     mot_tracker.pad_y = max(img.shape[1] - img.shape[0], 0) * (img_size / max(img.shape))
     mot_tracker.unpad_h = img_size - mot_tracker.pad_y
     mot_tracker.unpad_w = img_size - mot_tracker.pad_x
-    #print('tx2demo.py before if run')
 
     if detections is not None:
         tracked_objects = mot_tracker.update(detections.cpu())
         unique_labels = detections[:, -1].cpu().unique()
         n_cls_preds = len(unique_labels)
-        #print('mot_tracker run')            
 
         for i, trk in enumerate(mot_tracker.trackers):
             color = colors[int(trk.id+1) % len(colors)]
@@ -99,36 +97,44 @@ while(vid.isOpened()):
 
             cls = classes[int(trk.objclass)]
 
-            #print('cls check run')
             d = trk.get_state()[0]
             box_w = int(((d[2] - d[0]) / mot_tracker.unpad_w) * img.shape[1])
             box_h = int(((d[3] - d[1]) / mot_tracker.unpad_h) * img.shape[0])
             x1 = int(((d[0] - mot_tracker.pad_x / 2) / mot_tracker.unpad_w) * img.shape[1])
             y1 = int(((d[1] - mot_tracker.pad_y / 2) / mot_tracker.unpad_h) * img.shape[0])
             
-            #print('trk_color', trk.color) 
-            cv2.rectangle(frame, (x1, y1), (x1+box_w, y1+box_h),trk.color, 4)
+            cv2.rectangle(frame, (x1, y1), (x1+box_w, y1+box_h), (255,255,255), 4)
             #cv2.rectangle(frame, (x1, y1-35), (x1+len(cls)*19+60, y1), trk.color, -1)
-            #cv2.putText(frame, cls + "-" + str(int(trk.id)),(x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 3)
-            #print('id', trk.id) 
-            if not i in circle_list:
-                circle_list[i] = []
+            cv2.putText(frame, cls + "-" + str(int(trk.id)), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,2555,255), 3)
+
+            if not trk.id in circle_list:
+                circle_list[trk.id] = []
+            #if not trk.id in color_list:
+            #    color_list[trk.id] =[]
+            #if not trk.id in time_counter:
+            #    time_counter[trk.id] = [] 
             if trk.cir_x is not None and trk.cir_y is not None:
                 if cls == 'Write':
-                    #circle_list.appendleft(trk.centers)
-                    circle_list[i].append((trk.cir_x, trk.cir_y))
-                    color_list.append(trk.color)
-                    check_id.append(trk.id)
+                    circle_list[trk.id].append((trk.cir_x, trk.cir_y))
+            #        color_list[trk.id].append(trk.color)
+            #        time_counter[trk.id].append(time.perf_counter())
 
-    #if counter > 1:
     for box_id in circle_list.keys():
         for i in range(len(circle_list[box_id])):
-            #print(circle_list)
-            cv2.circle(frame, circle_list[box_id][i], 7, color_list[i], -1)
+            cv2.circle(frame, circle_list[box_id][i], 3, (255,255,255), -1)
             if i > 0:
-                cv2.line(frame, circle_list[box_id][i-1], circle_list[box_id][i],  color_list[i], 14)
-    
+                cv2.line(frame, circle_list[box_id][i-1], circle_list[box_id][i], (255,255,255), 6)
+                #if int(time_counter[box_id][i]) > 5:
+                #    del circle_list[box_id][i]
+                #    del time_counter[box_id]
+                #    print('deleted'
+
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    cv2.imshow(flscr,frame)
+    cv2.imshow(flscr, frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+    
+    if cv2.waitKey(1) & 0xFF == ord('c'):
+        circle_list.clear()
+        print('deleted')
+ 
