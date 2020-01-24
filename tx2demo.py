@@ -11,6 +11,8 @@ from collections import deque
 import time
 import warnings
 
+warnings.simplefilter('ignore')
+
 config_path='cfg/yolov3.cfg'
 weights_path='backup_0116/yolov3_6000.weights'
 class_path='cfg/Hand.names'
@@ -25,7 +27,6 @@ model.eval()
 classes = utils.load_classes(class_path)
 Tensor = torch.cuda.FloatTensor
 
-warnings.simplefilter('ignore')
 
 def detect_image(img):
     # scale and pad image
@@ -56,19 +57,20 @@ colors = [cmap(i)[:3] for i in np.linspace(0, 1, 20)]
 import cv2
 from sort import *
 
+#test = cv2.imread('test_graph.pdf')
+
 vid = cv2.VideoCapture(1)
 mot_tracker = Sort()
-li_max = 10
-li_del = 0
 tests = []
-flscr = 'fullscreen'
 circle_list = {}
 #color_list = {}
 #time_counter = {}
 check_id = deque()
 centers = None
-#cv2.namedWindow(flscr, cv2.WND_PROP_FULLSCREEN)
-#cv2.setWindowProperty(flscr, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+setcolor = (0,102,153)
+flscr = 'fullscreen'
+cv2.namedWindow(flscr, cv2.WINDOW_NORMAL)
+cv2.setWindowProperty(flscr, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 while(vid.isOpened()):
     ret, frame = vid.read()
@@ -77,7 +79,7 @@ while(vid.isOpened()):
     pilimg = Image.fromarray(frame)
     detections = detect_image(pilimg)
     
-    #frame = np.zeros((480, 640, 3))
+    frame = cv2.imread('imageflip.png')
     img = np.array(pilimg)
     mot_tracker.img_shape = [img.shape[0], img.shape[1]]
     mot_tracker.pad_x = max(img.shape[0] - img.shape[1], 0) * (img_size / max(img.shape))
@@ -85,11 +87,14 @@ while(vid.isOpened()):
     mot_tracker.unpad_h = img_size - mot_tracker.pad_y
     mot_tracker.unpad_w = img_size - mot_tracker.pad_x
 
+    #frame = cv2.imread('test0.png')
+
     if detections is not None:
         tracked_objects = mot_tracker.update(detections.cpu())
         unique_labels = detections[:, -1].cpu().unique()
         n_cls_preds = len(unique_labels)
 
+        #frame = cv2.imread('test0.png')
         for i, trk in enumerate(mot_tracker.trackers):
             color = colors[int(trk.id+1) % len(colors)]
             color = [i * 255 for i in color]
@@ -103,9 +108,10 @@ while(vid.isOpened()):
             x1 = int(((d[0] - mot_tracker.pad_x / 2) / mot_tracker.unpad_w) * img.shape[1])
             y1 = int(((d[1] - mot_tracker.pad_y / 2) / mot_tracker.unpad_h) * img.shape[0])
             
-            cv2.rectangle(frame, (x1, y1), (x1+box_w, y1+box_h), (255,255,255), 4)
+            #frame = cv2.imread('test0.png')
+            cv2.rectangle(frame, (x1, y1), (x1+box_w, y1+box_h), setcolor, 4)
             #cv2.rectangle(frame, (x1, y1-35), (x1+len(cls)*19+60, y1), trk.color, -1)
-            cv2.putText(frame, cls + "-" + str(int(trk.id)), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,2555,255), 3)
+            #cv2.putText(frame, cls + "-" + str(int(trk.id)), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, setcolor, 3)
 
             if not trk.id in circle_list:
                 circle_list[trk.id] = []
@@ -121,15 +127,17 @@ while(vid.isOpened()):
 
     for box_id in circle_list.keys():
         for i in range(len(circle_list[box_id])):
-            cv2.circle(frame, circle_list[box_id][i], 3, (255,255,255), -1)
+            cv2.circle(frame, circle_list[box_id][i], 3, setcolor, -1)
             if i > 0:
-                cv2.line(frame, circle_list[box_id][i-1], circle_list[box_id][i], (255,255,255), 6)
+                cv2.line(frame, circle_list[box_id][i-1], circle_list[box_id][i], setcolor, 6)
                 #if int(time_counter[box_id][i]) > 5:
                 #    del circle_list[box_id][i]
                 #    del time_counter[box_id]
                 #    print('deleted'
 
-    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    
+    #frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    frame = cv2.flip(frame, 1)
     cv2.imshow(flscr, frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
@@ -137,4 +145,3 @@ while(vid.isOpened()):
     if cv2.waitKey(1) & 0xFF == ord('c'):
         circle_list.clear()
         print('deleted')
- 

@@ -30,7 +30,7 @@ import argparse
 from filterpy.kalman import KalmanFilter
 from collections import deque
 import random
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 @jit
 def iou(bb_test,bb_gt):
@@ -106,8 +106,8 @@ class KalmanBoxTracker(object):
     self.age = 0
     self.objclass = bbox[6]
     self.centers = deque()
-    self.cir_x = 0
-    self.cir_y = 0
+    self.cir_x = None
+    self.cir_y = None
     self.col_b = 255
     self.col_g = 255
     self.col_r = 255
@@ -122,6 +122,7 @@ class KalmanBoxTracker(object):
     self.hits += 1
     self.hit_streak += 1
     self.kf.update(convert_bbox_to_z(bbox))
+    self.objclass = bbox[6]
 
   def predict(self):
     """
@@ -185,7 +186,7 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
 
 
 class Sort(object):
-  def __init__(self,max_age=1,min_hits=3):
+  def __init__(self,max_age=3,min_hits=3):
     """
     Sets key parameters for SORT
     """
@@ -246,13 +247,11 @@ class Sort(object):
       #self.trackers[t].centers.append((cir_x,cir_y))
       if(np.any(np.isnan(d))):
         to_del.append(t)
-        print('class sort update if(np.any)run line228')
 
     trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
     for t in reversed(to_del):
       self.trackers.pop(t)
 
-    print('line 234 run')
     matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets,trks)
 
     #update matched trackers with assigned detections
@@ -260,21 +259,18 @@ class Sort(object):
       if(t not in unmatched_trks):
         d = matched[np.where(matched[:,1]==t)[0],0]
         trk.update(dets[d,:][0])
-        print('line 242 matched run')
         #ret.append(np.concatenate([trk.objclass]))
 
     #create and initialise new trackers for unmatched detections
     for i in unmatched_dets:
         trk = KalmanBoxTracker(dets[i,:])
         self.trackers.append(trk)
-        print('line 249 unmached run')
 
     i = len(self.trackers)
     for trk in reversed(self.trackers):
         d = trk.get_state()[0]
         if((trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits)):
           ret.append(np.concatenate((d,[trk.id+1], [trk.objclass])).reshape(1,-1)) # +1 as MOT benchmark requires positive
-          print('line 256 ret.append run')
         i -= 1
         #remove dead tracklet
         if(trk.time_since_update > self.max_age):
